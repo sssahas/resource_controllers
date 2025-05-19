@@ -1,0 +1,6 @@
+flask
+boto3
+aws-cdk-lib
+constructs
+pyyaml
+jsii

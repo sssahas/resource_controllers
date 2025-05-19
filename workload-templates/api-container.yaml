@@ -1,0 +1,49 @@
+template_name: api_container
+description: >
+  Generic service template for deploying containerized API workloads to AWS App Runner.
+  Works with any image from ECR. Requires a service name, image URI, and optional environment variables.
+
+required_inputs:
+  - name: service_name
+    type: string
+    description: Unique name for the deployed service
+
+  - name: ecr_repo
+    type: string
+    description: Name of the ECR repository (must exist)
+
+  - name: image_tag
+    type: string
+    description: Tag of the image in the ECR repository
+
+optional_inputs:
+  - name: env
+    type: map
+    description: Environment variables to inject into the container (key-value pairs)
+
+  - name: cpu
+    type: string
+    default: "1024"
+    description: CPU size for the container (256, 512, 1024)
+
+  - name: memory
+    type: string
+    default: "2048"
+    description: Memory size in MB (512, 1024, 2048, 3072, 4096)
+
+  - name: resources
+    type: map
+    description: >
+      Optional AWS resources to provision alongside the App Runner service.
+      Each resource supports a list of entries, where each entry may include:
+        - name: logical name for the resource (used in outputs, environment, etc.)
+        - properties: (optional) map of AWS-specific configuration
+
+outputs:
+  - name: service_url
+    type: string
+    description: The public URL of the App Runner service
+
+  - name: status
+    type: string
+    description: Deployment status (e.g., deployed, failed)
