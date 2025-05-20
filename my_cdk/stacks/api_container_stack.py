@@ -19,33 +19,35 @@ class ApiDeployerStack(Stack):
         service_name = self.node.try_get_context("service_name")
         action = self.node.try_get_context("action")
         resources_raw = self.node.try_get_context("resources")
-        resources = json.loads(resources_raw) if isinstance(resources_raw, str) else resources_raw
+        resources = (
+            json.loads(resources_raw)
+            if isinstance(resources_raw, str)
+            else resources_raw
+        )
 
         if action == "deploy":
             if not image_repo or not image_tag or not service_name:
                 raise ValueError(
                     "Missing context: image_repo, image_tag, or service_name"
                 )
-            bucket_name = None
-            bucket_urn = None
             env_vars = {}
-                        
+
             for resource in resources:
                 if resource.get("type") == "s3":
-                    name = resource.get("name",None)
-                    properties = resource.get("properties",{})
+                    name = resource.get("name", None)
+                    properties = resource.get("properties", {})
                     if name:
-                        bucket_construct = S3BucketStack(self, f"{name}Construct", name, properties)
+                        bucket_construct = S3BucketStack(
+                            self, f"{name}Construct", name, properties
+                        )
                         bucket_arn = bucket_construct.bucket_arn
                         env_vars["BUCKET_ARN"] = bucket_arn or ""
-            
-            
+
             repository = ecr.Repository.from_repository_name(
                 self,
                 "ECRRepo",
                 repository_name=image_repo,
             )
-
 
             apprunner_role = iam.Role(
                 self,
@@ -59,10 +61,11 @@ class ApiDeployerStack(Stack):
             )
             # set env vars
             env_props = []
-            for k,v in env_vars.items():
-                env_props.append(apprunner.CfnService.KeyValuePairProperty(name=k, value=v)      )
-                
-            
+            for k, v in env_vars.items():
+                env_props.append(
+                    apprunner.CfnService.KeyValuePairProperty(name=k, value=v)
+                )
+
             service = apprunner.CfnService(
                 self,
                 "AppRunnerService",

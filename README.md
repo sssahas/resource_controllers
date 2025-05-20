@@ -2,11 +2,115 @@ This `prototype` code demonstrates how to use AWS CDK and Python Flask to stand 
 
 # Technical Brief
 
+## Concepts
+
+### Workload Templates
+
+Stored inside the `workload-templates` folder, a set of `.yaml` files defines all the types of workloads that can be managed by this `resource controllers` service. Examples are api_container, batch_data_processing, web_application, ml_ops etc.
+
+### Stacks
+
+An orchestrator that stands up or destroys a CDK stack needed for a given type of workload template. In this example, a standard container workload for APIs will be deployed to the AWS AppRunner service.
+
+### Auxiliary Resources
+
+Provides reusable resources across workload templates. For example, `s3_bucket.py` helps create an S3 bucket for the stack.
+
+For easier understanding,
+
+```mermaid
+
+erDiagram
+    WorkloadTemplate {
+        string template_name
+        string description
+        string[] required_inputs
+        string[] optional_inputs
+        string[] auxiliary_resources
+        string[] outputs
+    }
+    Stack {
+        string name
+        string deployment_status
+    }
+    AuxiliaryResource {
+        string name
+        string[] resource_configurations
+    }
+
+    WorkloadTemplate ||--o{ Stack : "defines"
+    Stack ||--o{ AuxiliaryResource : "uses"
+```
+
+---
+
 This service exposes the following API endpoints:
 
 ### 1. GET `/workload-templates`
 
 Returns all the templates available for the developer. Use `?long=true` to return all required and optional inputs, output signatures, and auxiliary resources needed alongside the APIs. Auxiliary resources can be sent via the `resources` list.
+
+```json
+[
+  {
+    "template_name": "api_container",
+    "description": "Generic service template for deploying containerized API workloads to AWS App Runner. Works with any image from ECR. Requires a service name, image URI, and optional environment variables.",
+    "required_inputs": [
+      {
+        "description": "Unique name for the deployed service",
+        "name": "service_name",
+        "type": "string"
+      },
+      {
+        "description": "Name of the ECR repository (must exist)",
+        "name": "ecr_repo",
+        "type": "string"
+      },
+      {
+        "description": "Tag of the image in the ECR repository",
+        "name": "image_tag",
+        "type": "string"
+      }
+    ],
+    "optional_inputs": [
+      {
+        "description": "Environment variables to inject into the container (key-value pairs)",
+        "name": "env",
+        "type": "map"
+      },
+      {
+        "default": "1024",
+        "description": "CPU size for the container (256, 512, 1024)",
+        "name": "cpu",
+        "type": "string"
+      },
+      {
+        "default": "2048",
+        "description": "Memory size in MB (512, 1024, 2048, 3072, 4096)",
+        "name": "memory",
+        "type": "string"
+      },
+      {
+        "name": "resources",
+        "type": "map",
+        "description": "Optional AWS resources to provision alongside the App Runner service. Each resource supports a list of entries, where each entry may include:\n  - name: logical name for the resource (used in outputs, environment, etc.)\n  - properties: (optional) map of AWS-specific configuration\n"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "service_url",
+        "type": "string",
+        "description": "The public URL of the App Runner service"
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "description": "Deployment status (e.g., deployed, failed)"
+      }
+    ]
+  }
+]
+```
 
 ### 2. POST `/deploy`
 
@@ -74,24 +178,6 @@ Uninstall/clean up.
   "service_name": "core_search"
 }
 ```
-
----
-
-## Concepts
-
-### Workload Templates
-
-Stored inside the `workload-templates` folder, a set of `.yaml` files defines all the types of workloads that can be managed by this `resource controllers` service.
-
-### Stacks
-
-An orchestrator that stands up or destroys a CDK stack needed for a given type of workload template.
-
-In this example, a standard container workload for APIs will be deployed to the AWS AppRunner service.
-
-### Auxiliary Resources
-
-Provides reusable resources across workload templates. For example, `s3_bucket.py` helps create an S3 bucket for this purpose.
 
 ---
 

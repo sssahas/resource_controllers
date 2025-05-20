@@ -11,6 +11,7 @@ app = Flask(__name__)
 CDK_DIR = "my_cdk"
 PORT = 8080
 
+
 def run_cdk_command(command_args):
     try:
         result = subprocess.run(
@@ -23,7 +24,6 @@ def run_cdk_command(command_args):
         return {"status": "success", "output": result.stdout}
     except subprocess.CalledProcessError as e:
         return {"status": "error", "output": e.stderr, "code": e.returncode}
-
 
 
 @app.route("/bootstrap", methods=["POST"])
@@ -55,7 +55,7 @@ def deploy():
     service_name = data.get(
         "service_name", f"{image_repo}-{image_tag.replace('.', '-')}"
     )
-    resources = data.get("resources",{})
+    resources = data.get("resources", {})
     output_dir = f"cd.out.deploy.{service_name}"
 
     command = [
@@ -71,7 +71,7 @@ def deploy():
         "--context",
         "action=deploy",
         "--context",
-        f"resources={resources}",        
+        f"resources={json.dumps(resources)}",
         "--output",
         output_dir,
         "deploy",
@@ -160,7 +160,7 @@ def list_templates():
     long = request.args.get("long", "False")
     if long.lower() == "true" or long == True:
         long = True
-    
+
     for yaml_file in templates_dir.glob("*.yaml"):
         with open(yaml_file) as f:
             data = yaml.safe_load(f)
