@@ -4,3 +4,4 @@ aws-cdk-lib
 constructs
 pyyaml
 jsii
+networkx

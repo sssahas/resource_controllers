@@ -1,14 +1,13 @@
 from flask import Flask, request, jsonify
 import subprocess
-import boto3
 import yaml
 from pathlib import Path
-import os
+import re
 import json
 
 app = Flask(__name__)
 
-CDK_DIR = "my_cdk"
+CDK_DIR = "automaton"
 PORT = 8080
 
 
@@ -24,6 +23,34 @@ def run_cdk_command(command_args):
         return {"status": "success", "output": result.stdout}
     except subprocess.CalledProcessError as e:
         return {"status": "error", "output": e.stderr, "code": e.returncode}
+
+
+def parse_destroy_output(stderr: str):
+    lines = stderr.splitlines()
+    stack_name = None
+    resources = []
+
+    resource_line_pattern = re.compile(
+        r"(?P<stack>[\w\-]+)\s+\|\s+\d+\s+\|\s+[\d:APM ]+\s+\|\s+(?P<status>[\w_]+)\s+\|\s+(?P<type>[\w:]+)\s+\|\s+(?P<name>.+)"
+    )
+
+    for line in lines:
+        if "destroying..." in line:
+            match = re.match(r"(?P<stack>[\w\-]+): destroying", line)
+            if match:
+                stack_name = match.group("stack")
+
+        match = resource_line_pattern.match(line)
+        if match:
+            resources.append(
+                {
+                    "type": match.group("type"),
+                    "name": match.group("name").strip(),
+                    "status": match.group("status"),
+                }
+            )
+
+    return {"status": "destroyed", "stack": stack_name, "resources": resources}
 
 
 @app.route("/bootstrap", methods=["POST"])
@@ -96,60 +123,30 @@ def deploy():
             500,
         )
 
-    try:
-        output_path = os.path.join(CDK_DIR, output_dir, "ApiDeployerStack.outputs.json")
-        with open(output_path) as f:
-            outputs = json.load(f)
-
-        service_url = outputs["ApiDeployerStack.ServiceUrl"]["value"]
-        status = outputs["ApiDeployerStack.ServiceStatus"]["value"]
-
-        return jsonify(
-            {
-                "request_status": "deployed",
-                "service_name": service_name,
-                "service_url": service_url,
-                "service_status": status,
-            }
-        )
-    except Exception as e:
-        return (
-            jsonify(
-                {
-                    "request_status": "error",
-                    "service_name": service_name,
-                    "service_url": None,
-                    "service_status": None,
-                    "error": str(e),
-                    "error_code": None,
-                }
-            ),
-            500,
-        )
-
 
 @app.route("/destroy", methods=["POST"])
 def destroy():
     data = request.json
     service_name = data["service_name"]
+    if service_name is None:
+        return jsonify({"error": "service_name is required"}), 400
     command = [
         "cdk",
+        "destroy",
         "--context",
         f"service_name={service_name}",
         "--context",
         "action=destroy",
-        "--output",
-        f"cd.out.destroy.{service_name}",
-        "destroy",
         "--force",
     ]
 
     result = subprocess.run(command, cwd=CDK_DIR, capture_output=True, text=True)
-
     if result.returncode != 0:
         return jsonify({"status": "error", "stderr": result.stderr}), 500
 
-    return jsonify({"status": "destroyed", "service_name": service_name})
+    # return jsonify({"status": "destroyed", "service_name": service_name})
+    parsed = parse_destroy_output(result.stderr)
+    return jsonify(parsed)
 
 
 @app.route("/workload-templates", methods=["GET"])
